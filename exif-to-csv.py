@@ -4,6 +4,7 @@ import argparse
 import os
 from csv import DictWriter as CsvWriter
 from pathlib import Path
+import sys
 
 from PIL import ExifTags, Image
 
@@ -13,7 +14,11 @@ FILEPATH_COL_NAME = "file_path"
 # Argument parsing
 parser = argparse.ArgumentParser(description="Exif Infos To CSV")
 parser.add_argument(
-    "-c", "--csv_name", help="Output CSV Filename", required=False, default=DEFAULT_CSV_FILENAME
+    "-c",
+    "--csv_name",
+    help="Output CSV Filename",
+    required=False,
+    default=DEFAULT_CSV_FILENAME,
 )
 parser.add_argument(
     "-d",
@@ -24,7 +29,11 @@ parser.add_argument(
 )
 argument = parser.parse_args()
 # Set the directory path and CSV file name
-img_path = argument.directory  # Update this path
+img_path = Path.resolve(Path(argument.directory))
+if not (Path.exists(img_path) and Path.is_dir(img_path)):
+    print(str(img_path) + " is not a valid directory")
+    sys.exit()
+print("Dossier parcouru : " + str(img_path))
 csv_path = Path(argument.csv_name)
 # Initialize lists to hold the data
 exif_data_cols = [FILEPATH_COL_NAME]
@@ -77,3 +86,4 @@ with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
     writer.writeheader()
     for row in exif_data:
         writer.writerow(row)
+print("Fichier CSV : " + str(Path.resolve(csv_path)))
