@@ -10,6 +10,7 @@ from PIL import ExifTags, Image
 
 DEFAULT_CSV_FILENAME = "EXIF_Data_Collection.csv"
 FILEPATH_COL_NAME = "file_path"
+EXIF_GPS_INFOS_TAG = "GPSInfo"
 
 # Argument parsing
 parser = argparse.ArgumentParser(description="Exif Infos To CSV")
@@ -28,6 +29,7 @@ parser.add_argument(
     default=os.getcwd(),
 )
 argument = parser.parse_args()
+
 # Set the directory path and CSV file name
 img_path = Path.resolve(Path(argument.directory))
 if not (Path.exists(img_path) and Path.is_dir(img_path)):
@@ -41,17 +43,29 @@ exif_data = []
 
 
 # Functions
-def get_exif_infos(image_path):
+def get_exif_infos(image_path: str):
     """Function returning exif_infos of picture"""
-    exif_infos = None
+    exif_infos = {}
     if is_valid_image_pillow(image_path):
         with Image.open(image_path) as img:
+            items = img.getexif().items() if image_path.endswith(".png") else img._getexif().items()
             exif_infos = {
-                ExifTags.TAGS[k]: v
-                for (k, v) in img.getexif().items()
+                ExifTags.TAGS[k]: "Bytes" if isinstance(v, bytes) else v
+                for (k, v) in items
                 if k in ExifTags.TAGS
             }
-            for exif_attr_name in exif_infos:
+            #GPS
+            if EXIF_GPS_INFOS_TAG in exif_infos.keys() :
+                exif_gps_infos = exif_infos[EXIF_GPS_INFOS_TAG]
+                for key in exif_gps_infos.keys():
+                    decode = ExifTags.GPSTAGS.get(key,key)
+                    if isinstance(decode, str) :
+                        value = list(exif_gps_infos[key])
+                        if value:
+                            exif_data_cols.append(decode)
+                            exif_infos[decode] = ".".join(str(x) for x in value)
+                del exif_infos[EXIF_GPS_INFOS_TAG]
+            for exif_attr_name in exif_infos.keys():
                 if exif_attr_name not in exif_data_cols:
                     exif_data_cols.append(exif_attr_name)
         return exif_infos
@@ -82,7 +96,7 @@ for root, dirs, files in os.walk(img_path):
 
 # Export to CSV
 with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
-    writer = CsvWriter(csvfile, fieldnames=exif_data_cols, delimiter=";")
+    writer = CsvWriter(csvfile, fieldnames=exif_data_cols, delimiter=";", escapechar='\\')
     writer.writeheader()
     for row in exif_data:
         writer.writerow(row)
