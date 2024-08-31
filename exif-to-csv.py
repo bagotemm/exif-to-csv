@@ -1,10 +1,12 @@
-"""This script create a EXIF_Data_Collection.csv file containing exif infos about the pictures found in imgpath"""
+"""Create csv file containing exif infos about the pictures found in dir"""
 
 import argparse
 import os
+import sys
+import traceback
+from collections.abc import Iterable
 from csv import DictWriter as CsvWriter
 from pathlib import Path
-import sys
 
 from PIL import ExifTags, Image
 
@@ -48,22 +50,28 @@ def get_exif_infos(image_path: str):
     exif_infos = {}
     if is_valid_image_pillow(image_path):
         with Image.open(image_path) as img:
-            items = img.getexif().items() if image_path.endswith(".png") else img._getexif().items()
+            items = (
+                img.getexif().items()
+                if image_path.endswith(".png")
+                else img._getexif().items()
+            )
             exif_infos = {
                 ExifTags.TAGS[k]: "Bytes" if isinstance(v, bytes) else v
                 for (k, v) in items
                 if k in ExifTags.TAGS
             }
-            #GPS
-            if EXIF_GPS_INFOS_TAG in exif_infos.keys() :
+            # GPS
+            if EXIF_GPS_INFOS_TAG in exif_infos.keys():
                 exif_gps_infos = exif_infos[EXIF_GPS_INFOS_TAG]
                 for key in exif_gps_infos.keys():
-                    decode = ExifTags.GPSTAGS.get(key,key)
-                    if isinstance(decode, str) :
-                        value = list(exif_gps_infos[key])
-                        if value:
-                            exif_data_cols.append(decode)
-                            exif_infos[decode] = ".".join(str(x) for x in value)
+                    decode = ExifTags.GPSTAGS.get(key, key)
+                    if isinstance(decode, str):
+                        gps_element = exif_gps_infos[key]
+                        if isinstance(gps_element, Iterable):
+                            value = list(gps_element)
+                            if value:
+                                exif_data_cols.append(decode)
+                                exif_infos[decode] = ".".join(str(x) for x in value)
                 del exif_infos[EXIF_GPS_INFOS_TAG]
             for exif_attr_name in exif_infos.keys():
                 if exif_attr_name not in exif_data_cols:
@@ -89,14 +97,26 @@ Path.unlink(csv_path, missing_ok=True)
 for root, dirs, files in os.walk(img_path):
     for file in files:
         full_path = os.path.join(root, file)
-        file_exif_infos = get_exif_infos(full_path)
-        if file_exif_infos is not None:
-            exif_data.append({FILEPATH_COL_NAME: full_path} | file_exif_infos)
+        try:
+            file_exif_infos = get_exif_infos(full_path)
+            if file_exif_infos is not None:
+                exif_data.append({FILEPATH_COL_NAME: full_path} | file_exif_infos)
+        except TypeError as te:
+            print("TypeError : KO (" + full_path + ") : " + te)
+            print(traceback.format_exc())
+        except ValueError as ve:
+            print("ValueError : KO (" + full_path + ") : " + ve)
+            print(traceback.format_exc())
+        except BaseException as be:
+            print("Exception : KO (" + full_path + ") : " + be)
+            print(traceback.format_exc())
 
 
 # Export to CSV
 with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
-    writer = CsvWriter(csvfile, fieldnames=exif_data_cols, delimiter=";", escapechar='\\')
+    writer = CsvWriter(
+        csvfile, fieldnames=exif_data_cols, delimiter=";", escapechar="\\"
+    )
     writer.writeheader()
     for row in exif_data:
         writer.writerow(row)
