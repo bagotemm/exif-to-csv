@@ -50,14 +50,15 @@ def get_exif_infos(image_path: str):
     exif_infos = {}
     if is_valid_image_pillow(image_path):
         with Image.open(image_path) as img:
-            items = (
-                img.getexif().items()
-                if image_path.endswith(".png")
-                else img._getexif().items()
-            )
+            if image_path.endswith(".jpg"):
+                exif = img._getexif()
+            else:
+                exif = img.getexif()
+            if exif is None:
+                return {}
             exif_infos = {
                 ExifTags.TAGS[k]: "Bytes" if isinstance(v, bytes) else v
-                for (k, v) in items
+                for (k, v) in exif.items()
                 if k in ExifTags.TAGS
             }
             # GPS
@@ -86,7 +87,6 @@ def is_valid_image_pillow(file_path):
             img.verify()
             return True
     except (IOError, SyntaxError):
-        print(file_path + " (not a picture)")
         return False
 
 
@@ -97,18 +97,22 @@ Path.unlink(csv_path, missing_ok=True)
 for root, dirs, files in os.walk(img_path):
     for file in files:
         full_path = os.path.join(root, file)
+        if full_path.endswith((".png", ".jpg", ".bmp")) is False:
+            continue
         try:
             file_exif_infos = get_exif_infos(full_path)
-            if file_exif_infos is not None:
+            if file_exif_infos:
                 exif_data.append({FILEPATH_COL_NAME: full_path} | file_exif_infos)
         except TypeError as te:
-            print("TypeError : KO (" + full_path + ") : " + te)
+            print("TypeError : KO (" + full_path + ") : " + str(te))
             print(traceback.format_exc())
         except ValueError as ve:
-            print("ValueError : KO (" + full_path + ") : " + ve)
+            print("ValueError : KO (" + full_path + ") : " + str(ve))
             print(traceback.format_exc())
+        except KeyboardInterrupt:
+            exit()
         except BaseException as be:
-            print("Exception : KO (" + full_path + ") : " + be)
+            print("Exception : KO (" + full_path + ") : " + str(be))
             print(traceback.format_exc())
 
 
