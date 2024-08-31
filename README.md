@@ -4,6 +4,12 @@ This script create a csv file containing exif infos about the pictures found in 
 
 ## Usage
 ### Command
+
+### Windows executable 
+```bash
+exif-to-csv.exe [-c/--csv_name <CSV_FILENAME>] [-d/--directory <DIRECTORY_PATH>] 
+```
+### Python script
 ```bash
 python exif-to-csv.py [-c/--csv_name <CSV_FILENAME>] [-d/--directory <DIRECTORY_PATH>] 
 ```
